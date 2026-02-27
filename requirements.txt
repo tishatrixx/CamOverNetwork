@@ -1,0 +1,7 @@
+logging==latest
+time==latest
+opencv-python==latest
+socketserver==latest
+http==latest
+threading==latest
+argparse==1.4.0

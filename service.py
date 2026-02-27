@@ -1,19 +1,23 @@
 import logging
+import time
 import socketserver
 from http import server
 from threading import Condition, Thread
 import cv2
+import argparse
 
-PAGE = """\
-<html>
-<body>
-<img src="stream.mjpg" width="640" height="480" />
-</body>
-</html>
-"""
+# -----------------------------------------------------------------------------------------------------------------------------
+#        This code is licenced under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/deed.en WITH attribution.
+# -----------------------------------------------------------------------------------------------------------------------------
+
+argument_parser = argparse.ArgumentParser(description="Streaming service")
+argument_parser.add_argument("-p", "--port", type=int, default=9842, help="Port used for localhost, defaults to 9842")
+
+class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 class StreamingOutput:
-    """Holds the latest MJPEG frame and notifies clients."""
     def __init__(self):
         self.frame = None
         self.condition = Condition()
@@ -26,24 +30,18 @@ class StreamingOutput:
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/':
+        if self.path == "/":
             self.send_response(301)
-            self.send_header('Location', '/index.html')
+            self.send_header("Location", "/stream.mjpg")
             self.end_headers()
-        elif self.path == '/index.html':
-            content = PAGE.encode('utf-8')
+        elif self.path == "/stream.mjpg":
             self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-        elif self.path == '/stream.mjpg':
-            self.send_response(200)
-            self.send_header('Age', 0)
+            self.send_header('Age', str(0))
             self.send_header('Cache-Control', 'no-cache, private')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
             self.end_headers()
+
             try:
                 while True:
                     with output.condition:
@@ -53,7 +51,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                         continue
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
-                    self.send_header('Content-Length', len(frame))
+                    self.send_header('Content-Length', str(len(frame)))
                     self.end_headers()
                     self.wfile.write(frame)
                     self.wfile.write(b'\r\n')
@@ -63,16 +61,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_error(404)
             self.end_headers()
 
-
-class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
-    allow_reuse_address = True
-    daemon_threads = True
-
-
-import time
-
-def capture_frames(camera_index=0, width=640, height=480, fps=30):
-    """Capture MJPEG frames and automatically recover if camera is unplugged."""
+def thread(camera_index=0, width=640, height=480, fps=30):
     cap = None
 
     while True:
@@ -109,16 +98,16 @@ def capture_frames(camera_index=0, width=640, height=480, fps=30):
 
 if __name__ == '__main__':
     output = StreamingOutput()
+    a = argument_parser.parse_args()
 
-    # Start frame capture in a separate thread
-    t = Thread(target=capture_frames, args=(0, 640, 480, 30))
+    t = Thread(target=thread, args=(0, 640, 480, 30))
     t.daemon = True
     t.start()
 
     try:
-        address = ('', 8000)
+        address = ('', a.port)
         server = StreamingServer(address, StreamingHandler)
-        print("Server started at http://localhost:8000")
+        print(f"Server started at http://localhost:{a.port}")
         server.serve_forever()
     except KeyboardInterrupt:
         print("Shutting down...")
