@@ -13,7 +13,6 @@ PAGE = """\
 """
 
 class StreamingOutput:
-    """Holds the latest MJPEG frame and notifies clients."""
     def __init__(self):
         self.frame = None
         self.condition = Condition()
@@ -72,7 +71,6 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 import time
 
 def capture_frames(camera_index=0, width=640, height=480, fps=30):
-    """Capture MJPEG frames and automatically recover if camera is unplugged."""
     cap = None
 
     while True:
@@ -110,7 +108,6 @@ def capture_frames(camera_index=0, width=640, height=480, fps=30):
 if __name__ == '__main__':
     output = StreamingOutput()
 
-    # Start frame capture in a separate thread
     t = Thread(target=capture_frames, args=(0, 640, 480, 30))
     t.daemon = True
     t.start()
